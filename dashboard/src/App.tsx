@@ -1,5 +1,7 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
+import { AuthContext, useAuthState } from './hooks/useAuth'
 import { ScansContext, useScansState } from './hooks/useScans'
+import { PrivateRoute } from './components/PrivateRoute'
 import { Navbar } from './components/Navbar'
 import { OperatorView } from './pages/OperatorView'
 import { AuditPage } from './pages/AuditPage'
@@ -25,9 +27,15 @@ function Layout() {
 }
 
 export default function App() {
+  const authState = useAuthState()
+
   return (
-    <BrowserRouter>
-      <Layout />
-    </BrowserRouter>
+    <AuthContext.Provider value={authState}>
+      <BrowserRouter>
+        <PrivateRoute>
+          <Layout />
+        </PrivateRoute>
+      </BrowserRouter>
+    </AuthContext.Provider>
   )
 }

@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 from prometheus_fastapi_instrumentator import Instrumentator
 
-from routes import scans, websocket, audit
+from routes import scans, websocket, audit, auth
 from core.detector import Detector
 from core.settings import settings
 from core.metrics import scans_total, inference_duration, detections_total, websocket_connections  # noqa: F401 — registra métricas
@@ -43,6 +43,7 @@ Instrumentator(
     excluded_handlers=["/metrics", "/health"],
 ).instrument(app).expose(app, include_in_schema=False)
 
+app.include_router(auth.router, prefix="/auth", tags=["auth"])
 app.include_router(scans.router, prefix="/scans", tags=["scans"])
 app.include_router(audit.router, prefix="/audit", tags=["audit"])
 app.include_router(websocket.router, tags=["websocket"])

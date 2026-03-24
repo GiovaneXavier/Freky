@@ -34,6 +34,15 @@ class Settings(BaseSettings):
     scan_input_dir: str = "/scans/incoming"
     scan_archive_dir: str = "/scans/archive"
 
+    # Autenticação JWT
+    jwt_secret_key: str = "change-me-in-production-use-a-long-random-string"
+    jwt_algorithm: str = "HS256"
+    jwt_expire_minutes: int = 480  # 8 horas
+
+    # Usuários do sistema — JSON: [{"username":"x","password":"y","role":"operator"}]
+    # Roles: "admin" (acesso total) | "operator" (somente leitura + feedback)
+    freky_users: str = '[{"username":"admin","password":"admin","role":"admin"}]'
+
     class Config:
         env_file = ".env"
 

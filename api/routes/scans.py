@@ -9,6 +9,7 @@ from models.database import get_db
 from models.scan import Scan
 from schemas.scan import ScanResult, FeedbackRequest
 from core.settings import settings
+from core.auth import get_current_user
 from core.metrics import scans_total, inference_duration, detections_total
 from routes.websocket import broadcast
 
@@ -20,6 +21,7 @@ async def process_scan(
     request: Request,
     file: UploadFile = File(...),
     db: AsyncSession = Depends(get_db),
+    _user: dict = Depends(get_current_user),
 ):
     """
     Recebe uma imagem (chamado pelo watcher apos Xport depositar o arquivo)
@@ -67,6 +69,7 @@ async def submit_feedback(
     scan_id: str,
     body: FeedbackRequest,
     db: AsyncSession = Depends(get_db),
+    _user: dict = Depends(get_current_user),
 ):
     scan = await db.get(Scan, scan_id)
     if not scan:

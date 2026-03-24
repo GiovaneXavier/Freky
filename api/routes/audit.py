@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from models.database import get_db
 from models.scan import Scan
 from schemas.scan import ScanListItem
+from core.auth import get_current_user
 
 router = APIRouter()
 
@@ -18,6 +19,7 @@ async def list_scans(
     date_to: date | None = None,
     decision: str | None = None,
     db: AsyncSession = Depends(get_db),
+    _user: dict = Depends(get_current_user),
 ):
     query = select(Scan).order_by(Scan.created_at.desc())
 
@@ -35,7 +37,7 @@ async def list_scans(
 
 
 @router.get("/stats")
-async def stats(db: AsyncSession = Depends(get_db)):
+async def stats(db: AsyncSession = Depends(get_db), _user: dict = Depends(get_current_user)):
     result = await db.execute(
         select(Scan.decision, func.count(Scan.id))
         .group_by(Scan.decision)
@@ -53,6 +55,7 @@ async def stats(db: AsyncSession = Depends(get_db)):
 async def daily_stats(
     days: int = Query(14, ge=1, le=90),
     db: AsyncSession = Depends(get_db),
+    _user: dict = Depends(get_current_user),
 ):
     """
     Retorna contagem de scans por dia e por decisao para os ultimos N dias.

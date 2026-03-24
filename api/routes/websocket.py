@@ -1,7 +1,8 @@
 import asyncio
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Query, status
 import json
 
+from core.auth import _decode_token
 from core.metrics import websocket_connections
 
 router = APIRouter()
@@ -10,7 +11,13 @@ _connections: list[WebSocket] = []
 
 
 @router.websocket("/ws")
-async def websocket_endpoint(websocket: WebSocket):
+async def websocket_endpoint(websocket: WebSocket, token: str = Query(...)):
+    try:
+        _decode_token(token)
+    except Exception:
+        await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
+        return
+
     await websocket.accept()
     _connections.append(websocket)
     websocket_connections.inc()
