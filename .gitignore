@@ -53,3 +53,8 @@ redis_data/
 # Logs
 *.log
 logs/
+
+# Coverage
+.coverage
+coverage.xml
+htmlcov/
