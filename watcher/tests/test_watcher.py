@@ -7,10 +7,9 @@ Cobre:
   - ScanHandler._send_to_api — sucesso, HTTP error, excecao inesperada
 """
 import sys
-import os
 import pytest
 from pathlib import Path
-from unittest.mock import MagicMock, patch, call
+from unittest.mock import MagicMock, patch
 import httpx
 
 # Garante que o modulo watcher seja importavel sem instalar o pacote

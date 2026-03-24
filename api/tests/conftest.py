@@ -2,12 +2,12 @@ import io
 import pytest
 from contextlib import asynccontextmanager
 from fastapi.testclient import TestClient
-from unittest.mock import MagicMock, AsyncMock, patch
+from unittest.mock import MagicMock, patch
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
 
 from main import app
 from models.database import Base, get_db
-from core.rules import Decision, Detection
+from core.rules import Decision
 
 
 # Banco SQLite em memoria para testes
@@ -51,8 +51,6 @@ def client(mock_detector):
     app.state.detector = mock_detector
 
     # Suprime o lifespan real para nao tentar conectar ao PostgreSQL
-    async_noop = AsyncMock()
-
     @asynccontextmanager
     async def mock_lifespan(_app):
         _app.state.detector = mock_detector

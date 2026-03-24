@@ -4,7 +4,6 @@ Testes para as rotas de auditoria:
   GET /audit/stats      — contagem por decisao
   GET /audit/daily      — serie temporal por dia
 """
-import pytest
 from datetime import datetime, timedelta
 
 

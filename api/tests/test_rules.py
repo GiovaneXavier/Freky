@@ -1,4 +1,3 @@
-import pytest
 from core.rules import apply_rules, Decision, Detection, RESTRICTED_ITEMS
 
 

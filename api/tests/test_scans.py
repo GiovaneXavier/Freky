@@ -1,6 +1,4 @@
-import io
 import pytest
-from unittest.mock import patch
 from core.rules import Decision, Detection
 
 
