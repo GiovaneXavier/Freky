@@ -10,7 +10,6 @@ import pytest
 from contextlib import asynccontextmanager
 from unittest.mock import AsyncMock, MagicMock, patch
 from fastapi.testclient import TestClient
-from starlette.websockets import WebSocketDisconnect
 
 from core.auth import create_access_token
 from main import app
@@ -71,7 +70,7 @@ class TestWebSocketEndpoint:
         mock_sleep = AsyncMock(side_effect=WSD)
         with patch("asyncio.sleep", mock_sleep):
             try:
-                with ws_client.websocket_connect(f"/ws?token={token}") as ws:
+                with ws_client.websocket_connect(f"/ws?token={token}"):
                     pass
             except Exception:
                 pass  # Qualquer exceção ao fechar é esperada

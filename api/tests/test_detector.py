@@ -14,7 +14,7 @@ import pytest
 from PIL import Image
 from unittest.mock import MagicMock, patch
 
-from core.detector import Detector, HIXRAY_CLASSES
+from core.detector import Detector
 from core.rules import Decision
 
 

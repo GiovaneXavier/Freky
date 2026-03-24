@@ -59,8 +59,6 @@ class TestAuthenticateUser:
     def test_credenciais_validas_bcrypt(self):
         # Usa hash bcrypt real ($2b$...) — autentica via pwd_context.verify
         # Mockamos pwd_context para não depender do binário bcrypt do ambiente
-        from unittest.mock import call
-
         fake_hash = "$2b$12$fakehashfakehashfakehashfakehashfakehashfakehash"
         fake_users = {
             "operador": {
