@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime
-from sqlalchemy import String, Float, DateTime, JSON, Enum as SAEnum
+from sqlalchemy import String, Float, DateTime, JSON, Enum as SAEnum, Index
 from sqlalchemy.orm import Mapped, mapped_column
 
 from models.database import Base
@@ -30,3 +30,9 @@ class Scan(Base):
     operator_id: Mapped[str | None] = mapped_column(String, nullable=True)
     operator_feedback: Mapped[str | None] = mapped_column(String, nullable=True)
     feedback_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+    __table_args__ = (
+        Index("ix_scans_created_at", "created_at"),
+        Index("ix_scans_decision", "decision"),
+        Index("ix_scans_created_at_decision", "created_at", "decision"),
+    )

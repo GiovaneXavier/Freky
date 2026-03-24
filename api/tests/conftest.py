@@ -24,6 +24,32 @@ async def override_get_db():
 
 
 @pytest.fixture(autouse=True)
+def no_cache(monkeypatch):
+    """
+    Desabilita o cache Redis em todos os testes.
+
+    Redis roda em CI (service container) e o cache persiste entre testes,
+    fazendo routes que cacheiam stats retornarem dados do teste anterior.
+    Patcheia as referencias importadas diretamente nos modulos de rota.
+    """
+    async def noop_get(key):
+        return None
+
+    async def noop_set(key, value, ttl_seconds=300):
+        pass
+
+    async def noop_delete_pattern(pattern):
+        pass
+
+    import routes.audit as audit_mod
+    import routes.scans as scans_mod
+
+    monkeypatch.setattr(audit_mod, "cache_get", noop_get)
+    monkeypatch.setattr(audit_mod, "cache_set", noop_set)
+    monkeypatch.setattr(scans_mod, "cache_delete_pattern", noop_delete_pattern)
+
+
+@pytest.fixture(autouse=True)
 async def setup_db():
     """Cria e destroi as tabelas no SQLite para cada teste."""
     async with engine_test.begin() as conn:

@@ -8,6 +8,8 @@ Fluxo:
 """
 
 import json
+import logging
+import os
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
@@ -17,6 +19,8 @@ from jose import JWTError, jwt
 from passlib.context import CryptContext
 
 from core.settings import settings
+
+log = logging.getLogger(__name__)
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
@@ -38,14 +42,24 @@ _USERS: dict[str, dict] = _load_users()
 def authenticate_user(username: str, password: str) -> dict | None:
     user = _USERS.get(username)
     if not user:
+        log.warning("Tentativa de login para usuário inexistente: %s", username)
         return None
     stored = user["password"]
-    # Suporta senha em texto puro (dev) ou hash bcrypt (prod)
-    valid = (
-        pwd_context.verify(password, stored)
-        if stored.startswith("$2b$")
-        else password == stored
-    )
+    is_test = os.getenv("FREKY_ENV") == "test"
+    if stored.startswith("$2b$"):
+        valid = pwd_context.verify(password, stored)
+    elif is_test:
+        # Permite senha em texto puro apenas em ambiente de testes
+        valid = password == stored
+    else:
+        log.error(
+            "Usuário '%s' tem senha em texto puro. "
+            "Use bcrypt hash em produção ($2b$...).",
+            username,
+        )
+        return None
+    if not valid:
+        log.warning("Falha de autenticação para usuário: %s", username)
     return user if valid else None
 
 

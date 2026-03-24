@@ -20,6 +20,10 @@ API_URL = os.getenv("API_URL", "http://api:8000")
 SCAN_INPUT_DIR = os.getenv("SCAN_INPUT_DIR", "/scans/incoming")
 SUPPORTED_EXTENSIONS = {".jpg", ".jpeg", ".tif", ".tiff"}
 
+# Retry
+MAX_RETRIES = int(os.getenv("WATCHER_MAX_RETRIES", "4"))
+RETRY_BASE_DELAY = float(os.getenv("WATCHER_RETRY_BASE_DELAY", "2.0"))  # segundos
+
 
 def wait_for_file_ready(path: Path, timeout: int = 10) -> bool:
     """
@@ -58,24 +62,56 @@ class ScanHandler(FileSystemEventHandler):
         self._send_to_api(path)
 
     def _send_to_api(self, path: Path):
-        try:
-            with path.open("rb") as f:
-                response = httpx.post(
-                    f"{API_URL}/scans/",
-                    files={"file": (path.name, f, "image/jpeg")},
-                    timeout=30.0,
+        delay = RETRY_BASE_DELAY
+        for attempt in range(1, MAX_RETRIES + 1):
+            try:
+                with path.open("rb") as f:
+                    response = httpx.post(
+                        f"{API_URL}/scans/",
+                        files={"file": (path.name, f, "image/jpeg")},
+                        timeout=30.0,
+                    )
+                response.raise_for_status()
+                result = response.json()
+                log.info(
+                    "Scan processado: %s → decisao=%s (%.0fms)",
+                    path.name,
+                    result["decision"],
+                    result["processing_time_ms"],
                 )
-            response.raise_for_status()
-            result = response.json()
-            log.info(
-                f"Scan processado: {path.name} → "
-                f"decisao={result['decision']} "
-                f"({result['processing_time_ms']:.0f}ms)"
-            )
-        except httpx.HTTPError as e:
-            log.error(f"Erro ao enviar scan para API: {e}")
-        except Exception as e:
-            log.error(f"Erro inesperado: {e}")
+                return
+            except httpx.HTTPStatusError as e:
+                # Erros 4xx não adianta tentar novamente
+                log.error(
+                    "Erro HTTP %d ao enviar %s (tentativa %d/%d): %s",
+                    e.response.status_code,
+                    path.name,
+                    attempt,
+                    MAX_RETRIES,
+                    e,
+                )
+                if 400 <= e.response.status_code < 500:
+                    return
+            except (httpx.RequestError, Exception) as e:
+                log.warning(
+                    "Falha ao enviar %s (tentativa %d/%d): %s",
+                    path.name,
+                    attempt,
+                    MAX_RETRIES,
+                    e,
+                )
+
+            if attempt < MAX_RETRIES:
+                log.info("Aguardando %.1fs antes de tentar novamente...", delay)
+                time.sleep(delay)
+                delay *= 2
+
+        log.error(
+            "Scan %s não pôde ser enviado após %d tentativas. Arquivo mantido em: %s",
+            path.name,
+            MAX_RETRIES,
+            path,
+        )
 
 
 def main():
