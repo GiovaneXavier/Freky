@@ -1,6 +1,6 @@
-from datetime import date
+from datetime import date, datetime, timedelta
 from fastapi import APIRouter, Depends, Query
-from sqlalchemy import select, func
+from sqlalchemy import select, func, cast, Date
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from models.database import get_db
@@ -46,3 +46,43 @@ async def stats(db: AsyncSession = Depends(get_db)):
         "total": total,
         "by_decision": counts,
     }
+
+
+@router.get("/daily")
+async def daily_stats(
+    days: int = Query(14, ge=1, le=90),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Retorna contagem de scans por dia e por decisao para os ultimos N dias.
+    Formato: [{ date: "2026-03-10", LIBERADO: 30, VERIFICAR: 5, INCONCLUSIVO: 2 }, ...]
+    """
+    since = datetime.utcnow().date() - timedelta(days=days - 1)
+
+    result = await db.execute(
+        select(
+            cast(Scan.created_at, Date).label("day"),
+            Scan.decision,
+            func.count(Scan.id).label("count"),
+        )
+        .where(Scan.created_at >= since)
+        .group_by("day", Scan.decision)
+        .order_by("day")
+    )
+    rows = result.all()
+
+    # Monta estrutura dia a dia com zeros para decisoes ausentes
+    decisions = ["LIBERADO", "VERIFICAR", "INCONCLUSIVO"]
+    data: dict[str, dict] = {}
+
+    # Inicializa todos os dias do range com zero
+    for i in range(days):
+        day = (since + timedelta(days=i)).isoformat()
+        data[day] = {"date": day, "LIBERADO": 0, "VERIFICAR": 0, "INCONCLUSIVO": 0}
+
+    for row in rows:
+        day_str = row.day.isoformat() if hasattr(row.day, "isoformat") else str(row.day)
+        if day_str in data and row.decision in decisions:
+            data[day_str][row.decision] = row.count
+
+    return list(data.values())
