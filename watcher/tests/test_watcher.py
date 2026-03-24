@@ -5,6 +5,7 @@ Cobre:
   - wait_for_file_ready   — arquivo estabiliza, nao existe, timeout
   - ScanHandler.on_created — ignora dirs, extensoes invalidas, envia arquivo valido
   - ScanHandler._send_to_api — sucesso, HTTP error, excecao inesperada
+  - Retry logic — backoff exponencial, sem retry em 4xx, esgota tentativas
 """
 import sys
 import pytest
@@ -15,7 +16,7 @@ import httpx
 # Garante que o modulo watcher seja importavel sem instalar o pacote
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from watcher import ScanHandler, wait_for_file_ready  # noqa: E402
+from watcher import ScanHandler, wait_for_file_ready, MAX_RETRIES  # noqa: E402
 
 
 # ──────────────────────────────────────────────────────────────
@@ -180,43 +181,132 @@ class TestSendToApi:
         assert "good.jpg" in caplog.text
 
     def test_captura_http_error_sem_propagar(self, tmp_path, caplog):
+        """Erro de rede nao deve propagar — so logar e tentar novamente."""
         import logging
         handler = self._handler()
         f = tmp_path / "scan.jpg"
         f.write_bytes(b"\xff\xd8")
 
         with patch("httpx.post", side_effect=httpx.HTTPError("timeout")), \
-             caplog.at_level(logging.ERROR, logger="watcher"):
+             patch("watcher.time.sleep"), \
+             caplog.at_level(logging.WARNING, logger="watcher"):
             handler._send_to_api(f)  # nao deve levantar excecao
 
-        assert "Erro" in caplog.text
+        assert "Falha" in caplog.text or "Erro" in caplog.text
 
     def test_captura_excecao_generica_sem_propagar(self, tmp_path, caplog):
+        """Excecao inesperada nao deve propagar — so logar."""
         import logging
         handler = self._handler()
         f = tmp_path / "scan.jpg"
         f.write_bytes(b"\xff\xd8")
 
         with patch("httpx.post", side_effect=RuntimeError("boom")), \
-             caplog.at_level(logging.ERROR, logger="watcher"):
+             patch("watcher.time.sleep"), \
+             caplog.at_level(logging.WARNING, logger="watcher"):
             handler._send_to_api(f)
 
-        assert "Erro" in caplog.text
+        assert "Falha" in caplog.text or "Erro" in caplog.text
 
-    def test_raise_for_status_em_erro_http(self, tmp_path, caplog):
-        """Resposta 4xx/5xx deve ser capturada via raise_for_status."""
+    def test_raise_for_status_em_erro_5xx(self, tmp_path, caplog):
+        """Resposta 5xx deve ser logada e retentada."""
         import logging
         handler = self._handler()
         f = tmp_path / "scan.jpg"
         f.write_bytes(b"\xff\xd8")
 
-        mock_response = MagicMock()
-        mock_response.raise_for_status.side_effect = httpx.HTTPStatusError(
-            "500", request=MagicMock(), response=MagicMock()
+        mock_resp = MagicMock()
+        mock_resp.status_code = 500
+        error = httpx.HTTPStatusError(
+            "500 Internal Server Error",
+            request=MagicMock(),
+            response=mock_resp,
         )
+        mock_resp.raise_for_status.side_effect = error
 
-        with patch("httpx.post", return_value=mock_response), \
+        with patch("httpx.post", return_value=mock_resp), \
+             patch("watcher.time.sleep"), \
              caplog.at_level(logging.ERROR, logger="watcher"):
             handler._send_to_api(f)
 
-        assert "Erro" in caplog.text
+        assert "500" in caplog.text
+
+
+# ──────────────────────────────────────────────────────────────
+# Retry logic
+# ──────────────────────────────────────────────────────────────
+
+class TestRetryBehavior:
+    def _handler(self):
+        return ScanHandler()
+
+    def test_retry_em_erro_de_rede_depois_sucesso(self, tmp_path):
+        """Falha na primeira tentativa, sucesso na segunda — deve chamar sleep 1 vez."""
+        handler = self._handler()
+        f = tmp_path / "scan.jpg"
+        f.write_bytes(b"\xff\xd8" + b"\x00" * 100)
+
+        mock_success = MagicMock()
+        mock_success.raise_for_status.return_value = None
+        mock_success.json.return_value = {"decision": "LIBERADO", "processing_time_ms": 50.0}
+
+        with patch("httpx.post", side_effect=[RuntimeError("timeout"), mock_success]), \
+             patch("watcher.time.sleep") as mock_sleep:
+            handler._send_to_api(f)
+
+        mock_sleep.assert_called_once()
+
+    def test_sem_retry_em_erro_4xx(self, tmp_path, caplog):
+        """HTTP 4xx nao deve ser retentado — retorna imediatamente."""
+        import logging
+        handler = self._handler()
+        f = tmp_path / "scan.jpg"
+        f.write_bytes(b"\xff\xd8" + b"\x00" * 100)
+
+        mock_resp = MagicMock()
+        mock_resp.status_code = 422
+        error = httpx.HTTPStatusError("422", request=MagicMock(), response=mock_resp)
+        mock_resp.raise_for_status.side_effect = error
+
+        with patch("httpx.post", return_value=mock_resp), \
+             patch("watcher.time.sleep") as mock_sleep, \
+             caplog.at_level(logging.ERROR, logger="watcher"):
+            handler._send_to_api(f)
+
+        mock_sleep.assert_not_called()
+        assert "422" in caplog.text
+
+    def test_esgota_retries_e_loga_erro_final(self, tmp_path, caplog):
+        """Apos MAX_RETRIES tentativas, loga erro final com nome do arquivo."""
+        import logging
+        handler = self._handler()
+        f = tmp_path / "scan.jpg"
+        f.write_bytes(b"\xff\xd8" + b"\x00" * 100)
+
+        with patch("httpx.post", side_effect=RuntimeError("offline")), \
+             patch("watcher.time.sleep") as mock_sleep, \
+             caplog.at_level(logging.ERROR, logger="watcher"):
+            handler._send_to_api(f)
+
+        assert mock_sleep.call_count == MAX_RETRIES - 1
+        assert "scan.jpg" in caplog.text
+
+    def test_backoff_exponencial(self, tmp_path):
+        """Delays entre retries devem dobrar a cada tentativa."""
+        import watcher as watcher_mod
+        handler = self._handler()
+        f = tmp_path / "scan.jpg"
+        f.write_bytes(b"\xff\xd8" + b"\x00" * 100)
+
+        sleep_calls = []
+
+        def fake_sleep(secs):
+            sleep_calls.append(secs)
+
+        with patch("httpx.post", side_effect=RuntimeError("offline")), \
+             patch("watcher.time.sleep", side_effect=fake_sleep):
+            handler._send_to_api(f)
+
+        base = watcher_mod.RETRY_BASE_DELAY
+        for i, delay in enumerate(sleep_calls):
+            assert delay == pytest.approx(base * (2 ** i))
