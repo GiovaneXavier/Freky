@@ -26,6 +26,9 @@ pydantic-settings==2.5.2
 python-jose[cryptography]==3.3.0
 passlib[bcrypt]==1.7.4
 
+# Rate limiting
+slowapi==0.1.9
+
 # Observabilidade
 prometheus-fastapi-instrumentator==7.0.0
 prometheus-client==0.21.0

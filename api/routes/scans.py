@@ -1,8 +1,11 @@
+import io
+import logging
 import time
 from datetime import datetime, timezone
 from pathlib import Path
 
 from fastapi import APIRouter, UploadFile, File, Depends, HTTPException, Request
+from PIL import Image
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from models.database import get_db
@@ -10,9 +13,11 @@ from models.scan import Scan
 from schemas.scan import ScanResult, FeedbackRequest
 from core.settings import settings
 from core.auth import get_current_user
+from core.cache import cache_delete_pattern
 from core.metrics import scans_total, inference_duration, detections_total
 from routes.websocket import broadcast
 
+log = logging.getLogger(__name__)
 router = APIRouter()
 
 
@@ -32,6 +37,21 @@ async def process_scan(
     image_path = archive_dir / file.filename
 
     content = await file.read()
+
+    # Valida tamanho
+    if len(content) > settings.max_upload_bytes:
+        raise HTTPException(
+            status_code=413,
+            detail=f"Arquivo muito grande. Máximo permitido: {settings.max_upload_bytes // (1024*1024)} MB.",
+        )
+
+    # Valida formato de imagem
+    try:
+        img = Image.open(io.BytesIO(content))
+        img.verify()
+    except Exception:
+        raise HTTPException(status_code=422, detail="Arquivo não é uma imagem válida.")
+
     image_path.write_bytes(content)
 
     start = time.monotonic()
@@ -58,7 +78,15 @@ async def process_scan(
     await db.commit()
     await db.refresh(scan)
 
+    await cache_delete_pattern("audit:*")
     result = ScanResult.model_validate(scan)
+    log.info(
+        "Scan concluído: file=%s decision=%s detections=%d elapsed_ms=%.1f",
+        file.filename,
+        decision.value,
+        len(detections),
+        elapsed_ms,
+    )
     await broadcast(result.model_dump(mode="json"))
 
     return result
