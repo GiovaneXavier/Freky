@@ -1,7 +1,8 @@
 import io
 import pytest
+from contextlib import asynccontextmanager
 from fastapi.testclient import TestClient
-from unittest.mock import MagicMock, patch, AsyncMock
+from unittest.mock import MagicMock, AsyncMock, patch
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
 
 from main import app
@@ -23,6 +24,7 @@ async def override_get_db():
 
 @pytest.fixture(autouse=True)
 async def setup_db():
+    """Cria e destroi as tabelas no SQLite para cada teste."""
     async with engine_test.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
     yield
@@ -39,10 +41,27 @@ def mock_detector():
 
 @pytest.fixture
 def client(mock_detector):
+    """
+    Client de teste com:
+    - DB substituido pelo SQLite em memoria
+    - Detector mockado
+    - Lifespan do app desabilitado (evita tentativa de conexao com PostgreSQL)
+    """
     app.dependency_overrides[get_db] = override_get_db
     app.state.detector = mock_detector
-    with TestClient(app) as c:
-        yield c
+
+    # Suprime o lifespan real para nao tentar conectar ao PostgreSQL
+    async_noop = AsyncMock()
+
+    @asynccontextmanager
+    async def mock_lifespan(_app):
+        _app.state.detector = mock_detector
+        yield
+
+    with patch.object(app.router, "lifespan_context", mock_lifespan):
+        with TestClient(app) as c:
+            yield c
+
     app.dependency_overrides.clear()
 
 
