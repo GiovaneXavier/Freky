@@ -74,7 +74,12 @@ jobs:
 
       - name: Install dependencies
         working-directory: api
-        run: pip install -r requirements-dev.txt
+        run: |
+          # onnxruntime-gpu nao tem wheel para Python 3.12; substitui por CPU para testes
+          grep -v onnxruntime-gpu requirements.txt > /tmp/req_no_gpu.txt
+          pip install -r /tmp/req_no_gpu.txt
+          pip install onnxruntime==1.19.2
+          pip install -r requirements-dev.txt --no-deps
 
       - name: Run tests
         working-directory: api
