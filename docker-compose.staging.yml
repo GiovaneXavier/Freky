@@ -36,7 +36,7 @@ services:
       retries: 3
       start_period: 15s
     depends_on:
-      postgres-staging:
+      sqlserver-staging:
         condition: service_healthy
       redis-staging:
         condition: service_healthy
@@ -92,21 +92,22 @@ services:
         max-size: "5m"
         max-file: "3"
 
-  postgres-staging:
-    image: postgres:16-alpine
-    env_file:
-      - .env.staging
+  sqlserver-staging:
+    image: mcr.microsoft.com/mssql/server:2022-latest
     environment:
-      - POSTGRES_DB=freky_staging
+      - ACCEPT_EULA=Y
+      - MSSQL_SA_PASSWORD=${MSSQL_SA_PASSWORD}
+      - MSSQL_PID=Express
     ports:
-      - "5433:5432"
+      - "1434:1433"
     volumes:
-      - postgres-staging-data:/var/lib/postgresql/data
+      - sqlserver-staging-data:/var/opt/mssql
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-freky} -d freky_staging"]
-      interval: 5s
+      test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P \"$$MSSQL_SA_PASSWORD\" -Q \"SELECT 1\" -C -b"]
+      interval: 10s
       timeout: 5s
-      retries: 5
+      retries: 10
+      start_period: 30s
     restart: unless-stopped
 
   redis-staging:
@@ -124,5 +125,5 @@ services:
 
 volumes:
   scans-staging:
-  postgres-staging-data:
+  sqlserver-staging-data:
   redis-staging-data:

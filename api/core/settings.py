@@ -6,7 +6,11 @@ class Settings(BaseSettings):
     api_port: int = 8000
     debug: bool = False
 
-    database_url: str = "postgresql://freky:changeme@postgres:5432/freky"
+    database_url: str = (
+        "mssql://freky:changeme@sqlserver:1433/freky"
+        "?driver=ODBC+Driver+18+for+SQL+Server"
+        "&TrustServerCertificate=yes"
+    )
     redis_url: str = "redis://redis:6379/0"
 
     model_path: str = "/app/model/weights/freky.onnx"
