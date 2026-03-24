@@ -28,7 +28,8 @@ export function useScansState(): ScansContextValue {
 
   useEffect(() => {
     function connect() {
-      const ws = new WebSocket(`${WS_URL}/ws`)
+      const token = localStorage.getItem('freky_token') ?? ''
+      const ws = new WebSocket(`${WS_URL}/ws?token=${encodeURIComponent(token)}`)
       wsRef.current = ws
 
       ws.onopen = () => setConnected(true)

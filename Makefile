@@ -1,8 +1,9 @@
-.PHONY: help up down dev test lint mock-scans train train-docker augment validate-dataset evaluate export infer clean
+.PHONY: help up down dev staging-up staging-down staging-logs staging-ps monitoring-up monitoring-down monitoring-open test lint mock-scans train train-docker augment validate-dataset evaluate export infer clean
 
 # Variaveis
-COMPOSE      = docker compose
-COMPOSE_DEV  = docker compose -f docker-compose.yml -f docker-compose.dev.yml
+COMPOSE         = docker compose
+COMPOSE_DEV     = docker compose -f docker-compose.yml -f docker-compose.dev.yml
+COMPOSE_STAGING = docker compose -f docker-compose.yml -f docker-compose.staging.yml --env-file .env.staging
 API_DIR      = api
 MODEL_DIR    = model
 
@@ -11,9 +12,21 @@ help:
 	@echo "  Freky — X-Ray Item Detection"
 	@echo ""
 	@echo "  Producao:"
-	@echo "    make up          Sobe todos os servicos"
-	@echo "    make down        Para todos os servicos"
-	@echo "    make logs        Mostra logs em tempo real"
+	@echo "    make up              Sobe todos os servicos"
+	@echo "    make down            Para todos os servicos"
+	@echo "    make logs            Mostra logs em tempo real"
+	@echo ""
+	@echo "  Monitoramento:"
+	@echo "    make monitoring-up   Sobe Prometheus (9090) + Grafana (3001)"
+	@echo "    make monitoring-down Para os servicos de monitoramento"
+	@echo "    make monitoring-open Abre Grafana no browser"
+	@echo ""
+	@echo "  Homologacao (staging):"
+	@echo "    make staging-up      Sobe stack de staging (porta 3001 / 8001)"
+	@echo "    make staging-down    Para stack de staging"
+	@echo "    make staging-logs    Logs em tempo real do staging"
+	@echo "    make staging-ps      Status dos servicos de staging"
+	@echo "    make staging-validate Valida pipeline no staging"
 	@echo ""
 	@echo "  Desenvolvimento:"
 	@echo "    make dev         Sobe stack de dev (hot-reload)"
@@ -47,6 +60,45 @@ logs:
 
 restart:
 	$(COMPOSE) restart
+
+# === Monitoramento ================================================
+
+monitoring-up:
+	$(COMPOSE) up -d prometheus grafana redis-exporter
+
+monitoring-down:
+	$(COMPOSE) stop prometheus grafana redis-exporter
+
+monitoring-open:
+	@echo "Grafana:    http://localhost:3001  (admin/admin)"
+	@echo "Prometheus: http://localhost:9090"
+	@xdg-open http://localhost:3001 2>/dev/null || open http://localhost:3001 2>/dev/null || true
+
+# === Homologação (staging) ========================================
+
+staging-up:
+	@test -f .env.staging || (echo "[ERRO] .env.staging nao encontrado. Copie .env.staging e ajuste as credenciais." && exit 1)
+	$(COMPOSE_STAGING) up -d --build
+
+staging-down:
+	$(COMPOSE_STAGING) down
+
+staging-logs:
+	$(COMPOSE_STAGING) logs -f
+
+staging-ps:
+	$(COMPOSE_STAGING) ps
+
+staging-validate:
+	@echo "Validando pipeline no staging..."
+	python scripts/validate_pipeline.py \
+		--model model/weights/freky.onnx \
+		--synthetic \
+		--output /tmp/staging-validation.json
+	@echo "Resultado salvo em /tmp/staging-validation.json"
+
+staging-clean:
+	$(COMPOSE_STAGING) down -v --remove-orphans
 
 # === Desenvolvimento ==============================================
 

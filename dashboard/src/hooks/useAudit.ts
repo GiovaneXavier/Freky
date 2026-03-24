@@ -3,6 +3,13 @@ import { Decision, ScanResult } from '../types/scan'
 
 const API = import.meta.env.VITE_API_URL ?? 'http://localhost:8000'
 
+function authHeaders(): HeadersInit {
+  const token = localStorage.getItem('freky_token')
+  return token
+    ? { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }
+    : { 'Content-Type': 'application/json' }
+}
+
 export interface AuditFilters {
   decision?: Decision | ''
   dateFrom?: string
@@ -35,7 +42,7 @@ export function useAudit(filters: AuditFilters) {
     if (filters.dateTo)    params.set('date_to',    filters.dateTo)
 
     try {
-      const res = await fetch(`${API}/audit/?${params}`)
+      const res = await fetch(`${API}/audit/?${params}`, { headers: authHeaders() })
       const data: ScanResult[] = await res.json()
       setScans(data)
       setHasMore(data.length === 50)
@@ -53,7 +60,7 @@ export function useAuditStats() {
   const [stats, setStats] = useState<AuditStats | null>(null)
 
   useEffect(() => {
-    fetch(`${API}/audit/stats`)
+    fetch(`${API}/audit/stats`, { headers: authHeaders() })
       .then(r => r.json())
       .then(setStats)
       .catch(() => {})
@@ -66,7 +73,7 @@ export function useDailyStats(days: number = 14) {
   const [data, setData] = useState<DailyStat[]>([])
 
   useEffect(() => {
-    fetch(`${API}/audit/daily?days=${days}`)
+    fetch(`${API}/audit/daily?days=${days}`, { headers: authHeaders() })
       .then(r => r.json())
       .then(setData)
       .catch(() => {})
@@ -82,7 +89,7 @@ export async function submitFeedback(
 ): Promise<void> {
   await fetch(`${API}/scans/${scanId}/feedback`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: authHeaders(),
     body: JSON.stringify({ operator_id: operatorId, feedback }),
   })
 }

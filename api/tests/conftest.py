@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
 
 from main import app
 from models.database import Base, get_db
+from core.auth import get_current_user
 from core.rules import Decision
 
 
@@ -47,7 +48,11 @@ def client(mock_detector):
     - Detector mockado
     - Lifespan do app desabilitado (evita tentativa de conexao com PostgreSQL)
     """
+    async def override_get_current_user():
+        return {"username": "test_operator", "role": "operator"}
+
     app.dependency_overrides[get_db] = override_get_db
+    app.dependency_overrides[get_current_user] = override_get_current_user
     app.state.detector = mock_detector
 
     # Suprime o lifespan real para nao tentar conectar ao PostgreSQL

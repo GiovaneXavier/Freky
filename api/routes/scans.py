@@ -1,5 +1,5 @@
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 from fastapi import APIRouter, UploadFile, File, Depends, HTTPException, Request
@@ -9,6 +9,8 @@ from models.database import get_db
 from models.scan import Scan
 from schemas.scan import ScanResult, FeedbackRequest
 from core.settings import settings
+from core.auth import get_current_user
+from core.metrics import scans_total, inference_duration, detections_total
 from routes.websocket import broadcast
 
 router = APIRouter()
@@ -19,6 +21,7 @@ async def process_scan(
     request: Request,
     file: UploadFile = File(...),
     db: AsyncSession = Depends(get_db),
+    _user: dict = Depends(get_current_user),
 ):
     """
     Recebe uma imagem (chamado pelo watcher apos Xport depositar o arquivo)
@@ -34,6 +37,12 @@ async def process_scan(
     start = time.monotonic()
     decision, detections = request.app.state.detector.predict(str(image_path))
     elapsed_ms = (time.monotonic() - start) * 1000
+
+    # Métricas Prometheus
+    inference_duration.observe(elapsed_ms / 1000)
+    scans_total.labels(decision=decision.value).inc()
+    for d in detections:
+        detections_total.labels(class_name=d.class_name).inc()
 
     scan = Scan(
         filename=file.filename,
@@ -60,6 +69,7 @@ async def submit_feedback(
     scan_id: str,
     body: FeedbackRequest,
     db: AsyncSession = Depends(get_db),
+    _user: dict = Depends(get_current_user),
 ):
     scan = await db.get(Scan, scan_id)
     if not scan:
@@ -67,7 +77,7 @@ async def submit_feedback(
 
     scan.operator_id = body.operator_id
     scan.operator_feedback = body.feedback
-    scan.feedback_at = datetime.utcnow()
+    scan.feedback_at = datetime.now(timezone.utc)
     await db.commit()
 
     return {"status": "ok"}

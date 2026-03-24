@@ -24,9 +24,11 @@ class Detector:
         model_path: str,
         confidence_threshold: float = 0.60,
         high_confidence_threshold: float = 0.85,
+        class_confidence_thresholds: dict[str, float] | None = None,
     ):
         self.confidence_threshold = confidence_threshold
         self.high_confidence_threshold = high_confidence_threshold
+        self.class_confidence_thresholds: dict[str, float] = class_confidence_thresholds or {}
         self._session = None
 
         if Path(model_path).exists():
@@ -61,10 +63,13 @@ class Detector:
             class_id = int(np.argmax(class_scores))
             confidence = float(class_scores[class_id])
 
-            if confidence < self.confidence_threshold:
-                continue
-
             class_name = HIXRAY_CLASSES.get(class_id, f"class_{class_id}")
+            threshold = self.class_confidence_thresholds.get(
+                class_name, self.confidence_threshold
+            )
+
+            if confidence < threshold:
+                continue
 
             # Normalizar coordenadas para [0,1]
             x1 = (x_c - w / 2) / orig_width

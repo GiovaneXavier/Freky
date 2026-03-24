@@ -27,6 +27,7 @@ model/data/processed/
 # Environment
 .env
 .env.local
+.env.staging.local
 
 # Scans (imagens reais, nao versionar)
 scans/
