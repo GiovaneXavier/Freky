@@ -1,0 +1,55 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg
+*.egg-info/
+dist/
+build/
+.eggs/
+.venv/
+venv/
+env/
+
+# Model weights
+*.pt
+*.pth
+*.onnx
+*.engine
+model/weights/
+
+# Dataset (large files)
+model/data/raw/
+model/data/processed/
+
+# Environment
+.env
+.env.local
+
+# Scans (imagens reais, nao versionar)
+scans/
+
+# Node
+node_modules/
+dashboard/dist/
+dashboard/.env
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docker volumes
+postgres_data/
+redis_data/
+
+# Logs
+*.log
+logs/
