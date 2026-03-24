@@ -1,0 +1,50 @@
+# Hyperparametros YOLOv8 otimizados para deteccao em raio-X de bagagem
+# Referencia: ultralytics/cfg/default.yaml (overrides parciais)
+#
+# Motivacao das escolhas:
+#   - lr0 baixo: fine-tuning em cima de COCO pre-treinado (nao treinamento do zero)
+#   - warmup_epochs: 5 porque o dataset HiXray e menor (~45k imagens)
+#   - mosaic: 0.8 (reduzido) pois mosaic agressivo distorce padroes de raio-X
+#   - flipud/fliplr: 0.0 — raio-X tem semantica direcional (nao flipar)
+#   - hsv_h/hsv_s: 0.0 — cor em raio-X e canal semantico, nao pode alterar
+#   - hsv_v: 0.3 — brilho pode variar (simula kV/mA diferentes do scanner)
+#   - degrees: 10.0 — objetos chegam em angulos variados na esteira
+#   - scale: 0.3 — objetos de tamanhos muito diferentes (laptop vs chave)
+#   - iou: 0.7 — NMS mais rigoroso para nao duplicar deteccoes sobrepostas
+
+# Otimizador
+lr0: 0.001           # taxa de aprendizado inicial (fine-tuning)
+lrf: 0.01            # fator final: lr_final = lr0 * lrf
+momentum: 0.937
+weight_decay: 0.0005
+warmup_epochs: 5.0
+warmup_momentum: 0.8
+warmup_bias_lr: 0.1
+
+# Funcao de perda
+box: 7.5             # peso da perda de localizacao
+cls: 0.5             # peso da perda de classificacao
+dfl: 1.5             # peso da perda DFL
+
+# NMS
+iou: 0.7             # threshold IoU para NMS
+
+# Augmentacao geometrica
+degrees: 10.0        # rotacao maxima (graus)
+translate: 0.1       # translacao maxima (fracao da imagem)
+scale: 0.3           # escala: [1-scale, 1+scale]
+shear: 2.0           # cisalhamento maximo (graus)
+perspective: 0.0     # distorcao de perspectiva (manter 0 para raio-X)
+flipud: 0.0          # SEM flip vertical
+fliplr: 0.0          # SEM flip horizontal
+
+# Augmentacao de cor (CUIDADO: raio-X usa cor semanticamente)
+hsv_h: 0.0           # SEM variacao de matiz
+hsv_s: 0.0           # SEM variacao de saturacao
+hsv_v: 0.3           # variacao de brilho (simula exposicao do scanner)
+
+# Augmentacao avancada
+mosaic: 0.8          # probabilidade de mosaico 4x4
+mixup: 0.1           # probabilidade de mixup (leve)
+copy_paste: 0.0      # copy-paste desativado (semantica de raio-X)
+erasing: 0.2         # random erasing (simula oclusao por outros objetos)
