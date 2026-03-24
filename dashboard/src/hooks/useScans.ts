@@ -1,10 +1,26 @@
-import { useEffect, useRef, useState } from 'react'
+import { createContext, useContext, useEffect, useRef, useState } from 'react'
 import { ScanResult } from '../types/scan'
 
 const WS_URL = import.meta.env.VITE_WS_URL ?? 'ws://localhost:8000'
 const MAX_HISTORY = 50
 
+interface ScansContextValue {
+  latest: ScanResult | null
+  history: ScanResult[]
+  connected: boolean
+}
+
+export const ScansContext = createContext<ScansContextValue>({
+  latest: null,
+  history: [],
+  connected: false,
+})
+
 export function useScans() {
+  return useContext(ScansContext)
+}
+
+export function useScansState(): ScansContextValue {
   const [latest, setLatest] = useState<ScanResult | null>(null)
   const [history, setHistory] = useState<ScanResult[]>([])
   const [connected, setConnected] = useState(false)
@@ -18,7 +34,7 @@ export function useScans() {
       ws.onopen = () => setConnected(true)
       ws.onclose = () => {
         setConnected(false)
-        setTimeout(connect, 3000) // reconecta automaticamente
+        setTimeout(connect, 3000)
       }
       ws.onmessage = (event) => {
         const msg = JSON.parse(event.data)

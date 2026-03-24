@@ -1,0 +1,39 @@
+# Override para desenvolvimento local.
+# Use: docker compose -f docker-compose.yml -f docker-compose.dev.yml up
+# Ou:  make dev
+#
+# Diferencas do ambiente de producao:
+#   - API roda com hot-reload (uvicorn --reload)
+#   - Codigo montado como volume (sem rebuild a cada mudanca)
+#   - DEBUG=true
+#   - Dashboard roda com vite dev server (HMR)
+#   - Sem imagem do dashboard — substituido pelo vite direto
+
+services:
+  api:
+    volumes:
+      - ./api:/app
+    environment:
+      - DEBUG=true
+    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+
+  watcher:
+    volumes:
+      - ./watcher:/app
+    environment:
+      - SCAN_INPUT_DIR=/scans/incoming
+      - SCAN_ARCHIVE_DIR=/scans/archive
+      - API_URL=http://api:8000
+
+  dashboard:
+    build:
+      context: .
+      dockerfile: docker/dashboard.dev.Dockerfile
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./dashboard:/app
+      - /app/node_modules
+    environment:
+      - VITE_API_URL=http://localhost:8000
+      - VITE_WS_URL=ws://localhost:8000

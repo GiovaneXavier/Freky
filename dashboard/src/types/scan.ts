@@ -13,4 +13,6 @@ export interface ScanResult {
   decision: Decision
   detections: Detection[]
   processing_time_ms: number | null
+  operator_feedback?: string | null
+  operator_id?: string | null
 }

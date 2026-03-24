@@ -32,7 +32,10 @@ class ScanListItem(BaseModel):
     created_at: datetime
     filename: str
     decision: Decision
+    detections: list[DetectionSchema]
+    processing_time_ms: float | None
     operator_feedback: str | None
+    operator_id: str | None
 
     class Config:
         from_attributes = True
