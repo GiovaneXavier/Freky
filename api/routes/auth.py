@@ -4,7 +4,7 @@ from fastapi import Depends
 from pydantic import BaseModel
 
 from core.auth import authenticate_user, create_access_token
-from main import limiter
+from core.limiter import limiter
 
 router = APIRouter()
 
