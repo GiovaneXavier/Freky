@@ -1,0 +1,128 @@
+# Ambiente de homologação (staging).
+# Uso:
+#   make staging-up
+#   docker compose -f docker-compose.yml -f docker-compose.staging.yml up -d --build
+#
+# Diferenças em relação à produção:
+#   - Imagens tagueadas com :staging para não contaminar :latest
+#   - Porta do dashboard: 3001 (evita conflito com prod local)
+#   - API exposta em 8001
+#   - Healthchecks mais agressivos (detecção de falha mais rápida)
+#   - Variáveis de ambiente carregadas de .env.staging
+#   - Volume de scans isolado (scans-staging) para não misturar com prod
+#   - Logs em JSON estruturado para facilitar coleta por agente de log
+#   - postgres e redis em portas 5433/6380 para coexistir com prod local
+
+services:
+  api:
+    image: freky-api:staging
+    build:
+      cache_from:
+        - freky-api:staging
+    ports:
+      - "8001:8000"
+    env_file:
+      - .env.staging
+    environment:
+      - DEBUG=false
+      - LOG_FORMAT=json
+    volumes:
+      - scans-staging:/scans
+      - ./model/weights:/app/model/weights:ro
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    depends_on:
+      postgres-staging:
+        condition: service_healthy
+      redis-staging:
+        condition: service_healthy
+    restart: on-failure:3
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "5"
+
+  watcher:
+    image: freky-watcher:staging
+    build:
+      cache_from:
+        - freky-watcher:staging
+    env_file:
+      - .env.staging
+    environment:
+      - SCAN_INPUT_DIR=/scans/incoming
+      - SCAN_ARCHIVE_DIR=/scans/archive
+      - API_URL=http://api:8000
+    volumes:
+      - scans-staging:/scans
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: on-failure:3
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "5m"
+        max-file: "3"
+
+  dashboard:
+    image: freky-dashboard:staging
+    build:
+      cache_from:
+        - freky-dashboard:staging
+      args:
+        - VITE_API_URL=http://localhost:8001
+        - VITE_WS_URL=ws://localhost:8001
+    ports:
+      - "3001:80"
+    volumes:
+      - ./docker/nginx.staging.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: on-failure:3
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "5m"
+        max-file: "3"
+
+  postgres-staging:
+    image: postgres:16-alpine
+    env_file:
+      - .env.staging
+    environment:
+      - POSTGRES_DB=freky_staging
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres-staging-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-freky} -d freky_staging"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  redis-staging:
+    image: redis:7-alpine
+    ports:
+      - "6380:6379"
+    volumes:
+      - redis-staging-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+
+volumes:
+  scans-staging:
+  postgres-staging-data:
+  redis-staging-data:
