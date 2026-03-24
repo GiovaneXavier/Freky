@@ -1,6 +1,6 @@
 from datetime import date, datetime, timedelta
 from fastapi import APIRouter, Depends, Query
-from sqlalchemy import select, func, String, cast, Date
+from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from models.database import get_db
@@ -65,15 +65,16 @@ async def daily_stats(
     """
     since = datetime.utcnow().date() - timedelta(days=days - 1)
 
+    day_expr = func.date(Scan.created_at)
     result = await db.execute(
         select(
-            cast(cast(Scan.created_at, Date), String).label("day"),
+            day_expr.label("day"),
             Scan.decision,
             func.count(Scan.id).label("count"),
         )
         .where(Scan.created_at >= since)
-        .group_by(cast(cast(Scan.created_at, Date), String), Scan.decision)
-        .order_by(cast(cast(Scan.created_at, Date), String))
+        .group_by(day_expr, Scan.decision)
+        .order_by(day_expr)
     )
     rows = result.all()
 
