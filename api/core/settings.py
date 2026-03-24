@@ -13,6 +13,20 @@ class Settings(BaseSettings):
     confidence_threshold: float = 0.60
     high_confidence_threshold: float = 0.85
 
+    # Thresholds por classe — itens críticos (segurança) usam limiar menor
+    # para reduzir falsos negativos; itens não críticos usam limiar maior.
+    # Sobrescreve confidence_threshold quando a classe está presente.
+    class_confidence_thresholds: dict[str, float] = {
+        "portable_charger_1": 0.55,
+        "portable_charger_2": 0.55,
+        "mobile_phone": 0.50,
+        "laptop": 0.65,
+        "tablet": 0.60,
+        "cosmetic": 0.75,
+        "water": 0.70,
+        "nonmetallic_lighter": 0.55,
+    }
+
     scan_input_dir: str = "/scans/incoming"
     scan_archive_dir: str = "/scans/archive"
 

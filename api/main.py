@@ -15,6 +15,7 @@ async def lifespan(app: FastAPI):
         model_path=settings.model_path,
         confidence_threshold=settings.confidence_threshold,
         high_confidence_threshold=settings.high_confidence_threshold,
+        class_confidence_thresholds=settings.class_confidence_thresholds,
     )
     yield
     # cleanup
