@@ -2,6 +2,8 @@ import asyncio
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 import json
 
+from core.metrics import websocket_connections
+
 router = APIRouter()
 
 _connections: list[WebSocket] = []
@@ -11,6 +13,7 @@ _connections: list[WebSocket] = []
 async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()
     _connections.append(websocket)
+    websocket_connections.inc()
     try:
         while True:
             # Mantem a conexao viva com ping a cada 30s
@@ -18,6 +21,7 @@ async def websocket_endpoint(websocket: WebSocket):
             await websocket.send_text(json.dumps({"type": "ping"}))
     except WebSocketDisconnect:
         _connections.remove(websocket)
+        websocket_connections.dec()
 
 
 async def broadcast(data: dict):

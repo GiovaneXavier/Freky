@@ -9,6 +9,7 @@ from models.database import get_db
 from models.scan import Scan
 from schemas.scan import ScanResult, FeedbackRequest
 from core.settings import settings
+from core.metrics import scans_total, inference_duration, detections_total
 from routes.websocket import broadcast
 
 router = APIRouter()
@@ -34,6 +35,12 @@ async def process_scan(
     start = time.monotonic()
     decision, detections = request.app.state.detector.predict(str(image_path))
     elapsed_ms = (time.monotonic() - start) * 1000
+
+    # Métricas Prometheus
+    inference_duration.observe(elapsed_ms / 1000)
+    scans_total.labels(decision=decision.value).inc()
+    for d in detections:
+        detections_total.labels(class_name=d.class_name).inc()
 
     scan = Scan(
         filename=file.filename,

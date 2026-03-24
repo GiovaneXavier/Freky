@@ -1,4 +1,4 @@
-.PHONY: help up down dev staging-up staging-down staging-logs staging-ps test lint mock-scans train train-docker augment validate-dataset evaluate export infer clean
+.PHONY: help up down dev staging-up staging-down staging-logs staging-ps monitoring-up monitoring-down monitoring-open test lint mock-scans train train-docker augment validate-dataset evaluate export infer clean
 
 # Variaveis
 COMPOSE         = docker compose
@@ -15,6 +15,11 @@ help:
 	@echo "    make up              Sobe todos os servicos"
 	@echo "    make down            Para todos os servicos"
 	@echo "    make logs            Mostra logs em tempo real"
+	@echo ""
+	@echo "  Monitoramento:"
+	@echo "    make monitoring-up   Sobe Prometheus (9090) + Grafana (3001)"
+	@echo "    make monitoring-down Para os servicos de monitoramento"
+	@echo "    make monitoring-open Abre Grafana no browser"
 	@echo ""
 	@echo "  Homologacao (staging):"
 	@echo "    make staging-up      Sobe stack de staging (porta 3001 / 8001)"
@@ -55,6 +60,19 @@ logs:
 
 restart:
 	$(COMPOSE) restart
+
+# === Monitoramento ================================================
+
+monitoring-up:
+	$(COMPOSE) up -d prometheus grafana redis-exporter
+
+monitoring-down:
+	$(COMPOSE) stop prometheus grafana redis-exporter
+
+monitoring-open:
+	@echo "Grafana:    http://localhost:3001  (admin/admin)"
+	@echo "Prometheus: http://localhost:9090"
+	@xdg-open http://localhost:3001 2>/dev/null || open http://localhost:3001 2>/dev/null || true
 
 # === Homologação (staging) ========================================
 
