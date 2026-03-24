@@ -61,6 +61,8 @@ jobs:
       CONFIDENCE_THRESHOLD: "0.60"
       HIGH_CONFIDENCE_THRESHOLD: "0.85"
       DEBUG: "true"
+      SCAN_ARCHIVE_DIR: /tmp/scans/archive
+      SCAN_INPUT_DIR: /tmp/scans/incoming
 
     steps:
       - uses: actions/checkout@v4
