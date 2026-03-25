@@ -93,6 +93,12 @@ class ScanHandler(FileSystemEventHandler):
 
         self._send_to_api(path)
 
+    def _refresh_token(self):
+        """Renova o token JWT."""
+        new_token = get_token()
+        if new_token:
+            self._token = new_token
+
     def _send_to_api(self, path: Path):
         delay = RETRY_BASE_DELAY
         for attempt in range(1, MAX_RETRIES + 1):
@@ -114,7 +120,10 @@ class ScanHandler(FileSystemEventHandler):
                 )
                 return
             except httpx.HTTPStatusError as e:
-                # Erros 4xx não adianta tentar novamente
+                if e.response.status_code == 401:
+                    log.warning("Token expirado, renovando...")
+                    self._refresh_token()
+                    continue
                 log.error(
                     "Erro HTTP %d ao enviar %s (tentativa %d/%d): %s",
                     e.response.status_code,
