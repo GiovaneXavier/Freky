@@ -37,6 +37,8 @@ services:
       - SCAN_ARCHIVE_DIR=${SCAN_ARCHIVE_DIR}
       - API_URL=http://api:8000
       - REDIS_URL=${REDIS_URL}
+      - WATCHER_USERNAME=${WATCHER_USERNAME}
+      - WATCHER_PASSWORD=${WATCHER_PASSWORD}
     volumes:
       - ./scans:/scans
     depends_on:
