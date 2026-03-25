@@ -8,6 +8,7 @@ sqlalchemy==2.0.35
 alembic==1.13.3
 aioodbc==0.5.0
 pyodbc==5.1.0
+asyncpg==0.30.0
 
 # Redis
 redis==5.1.1
@@ -25,6 +26,7 @@ pydantic-settings==2.5.2
 # Autenticação
 python-jose[cryptography]==3.3.0
 passlib[bcrypt]==1.7.4
+bcrypt==4.0.1
 
 # Rate limiting
 slowapi==0.1.9

@@ -1,7 +1,7 @@
 import io
 import logging
 import time
-from datetime import datetime, timezone
+from datetime import datetime
 from pathlib import Path
 
 from fastapi import APIRouter, UploadFile, File, Depends, HTTPException, Request
@@ -105,7 +105,7 @@ async def submit_feedback(
 
     scan.operator_id = body.operator_id
     scan.operator_feedback = body.feedback
-    scan.feedback_at = datetime.now(timezone.utc)
+    scan.feedback_at = datetime.utcnow()
     await db.commit()
 
     return {"status": "ok"}
